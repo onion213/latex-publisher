@@ -1,0 +1,56 @@
+name: Build and Deploy LaTeX to Vercel
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'latex/**.tex'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up the environment (install dependencies)
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-full
+
+      # Step 3: Convert LaTeX to HTML
+      - name: Convert LaTeX to HTML
+        run: |
+          mkdir -p public
+          for texfile in $(find latex -name "*.tex"); do
+            # Derive the output path by removing the 'latex/' prefix and '.tex' suffix
+            relative_path=${texfile#latex/}
+            output_path=${relative_path%.tex}.html
+            # Create necessary directories
+            mkdir -p public/$(dirname "$output_path")
+            # Convert to HTML using Pandoc with CSS styling and MathJax for equations
+            pandoc "$texfile" \
+              --standalone \
+              --toc \
+              --mathjax \
+              --css styles/styles.css \
+              -o "public/${output_path}"
+          done
+
+      # Step 4: Deploy to Vercel
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          build-command: echo "No build needed"
+          output-directory: public
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
