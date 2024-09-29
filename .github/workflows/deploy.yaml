@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'latex/**.tex'
+      - 'styles/**'
+      - 'vercel.json'
 
 jobs:
   build-and-deploy:
@@ -16,23 +18,25 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up the environment (install dependencies)
+      # Step 2: Install Dependencies
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc texlive-full
+          sudo apt-get install -y pandoc texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended
 
       # Step 3: Convert LaTeX to HTML
       - name: Convert LaTeX to HTML
         run: |
           mkdir -p public
+          # Convert LaTeX files to HTML
           for texfile in $(find latex -name "*.tex"); do
-            # Derive the output path by removing the 'latex/' prefix and '.tex' suffix
             relative_path=${texfile#latex/}
             output_path=${relative_path%.tex}.html
-            # Create necessary directories
+            # Handle the main.tex as index.html
+            if [[ "$relative_path" == "main.tex" ]]; then
+              output_path="index.html"
+            fi
             mkdir -p public/$(dirname "$output_path")
-            # Convert to HTML using Pandoc with CSS styling and MathJax for equations
             pandoc "$texfile" \
               --standalone \
               --toc \
@@ -40,16 +44,28 @@ jobs:
               --css styles/styles.css \
               -o "public/${output_path}"
           done
+          # Copy all non-tex files (assets) to public/
+          rsync -av --exclude='*.tex' latex/ public/
 
-      # Step 4: Deploy to Vercel
+      # Step 4: Replace .tex links with clean URLs
+      - name: Update HTML Links
+        run: |
+          find public -name "*.html" -exec sed -i 's/\.tex//g' {} +
+
+      # Step 5: List Public Directory Contents (Debugging)
+      - name: List Public Directory Contents
+        run: |
+          echo "Contents of public/:"
+          ls -R public/
+
+      # Step 6: Deploy to Vercel
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./
-          vercel-args: '--prod'
+          working-directory: public
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
