@@ -7,32 +7,32 @@ on:
     paths:
       - 'latex/**.tex'
       - 'styles/**'
-      - 'vercel.json'
+      - 'public/vercel.json'  # vercel.json が public/ 内に移動されたため
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
+      # ステップ1: リポジトリのチェックアウト
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Install Dependencies
+      # ステップ2: 依存関係のインストール
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended
 
-      # Step 3: Convert LaTeX to HTML
+      # ステップ3: LaTeX を HTML に変換
       - name: Convert LaTeX to HTML
         run: |
           mkdir -p public
-          # Convert LaTeX files to HTML
+          # LaTeX ファイルを HTML に変換
           for texfile in $(find latex -name "*.tex"); do
             relative_path=${texfile#latex/}
             output_path=${relative_path%.tex}.html
-            # Handle the main.tex as index.html
+            # main.tex を index.html として扱う
             if [[ "$relative_path" == "main.tex" ]]; then
               output_path="index.html"
             fi
@@ -44,21 +44,21 @@ jobs:
               --css styles/styles.css \
               -o "public/${output_path}"
           done
-          # Copy all non-tex files (assets) to public/
+          # アセットを public/ にコピー
           rsync -av --exclude='*.tex' latex/ public/
 
-      # Step 4: Replace .tex links with clean URLs
+      # ステップ4: HTML リンクの .tex 拡張子を削除
       - name: Update HTML Links
         run: |
           find public -name "*.html" -exec sed -i 's/\.tex//g' {} +
 
-      # Step 5: List Public Directory Contents (Debugging)
+      # ステップ5: public ディレクトリの内容をリスト表示（デバッグ用）
       - name: List Public Directory Contents
         run: |
           echo "Contents of public/:"
           ls -R public/
 
-      # Step 6: Deploy to Vercel
+      # ステップ6: Vercel へのデプロイ
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:
